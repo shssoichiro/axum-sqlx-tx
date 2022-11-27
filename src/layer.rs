@@ -25,6 +25,16 @@ pub struct Layer<DB: sqlx::Database, E = Error> {
     _error: PhantomData<E>,
 }
 
+// can't simply derive because `DB` isn't `Clone`
+impl<DB: sqlx::Database, E> Clone for Layer<DB, E> {
+    fn clone(&self) -> Self {
+        Self {
+            pool: self.pool.clone(),
+            _error: self._error,
+        }
+    }
+}
+
 impl<DB: sqlx::Database> Layer<DB> {
     /// Construct a new layer with the given `pool`.
     ///
@@ -140,7 +150,7 @@ mod tests {
 
         let app = axum::Router::new()
             .route("/", axum::routing::get(|| async { "hello" }))
-            .layer(Layer::new(pool));
+            .layer(&Layer::new(pool));
 
         axum::Server::bind(todo!()).serve(app.into_make_service());
     }

@@ -2,10 +2,9 @@
 
 use std::marker::PhantomData;
 
-use axum_core::{
-    extract::{FromRequest, RequestParts},
-    response::IntoResponse,
-};
+use async_trait::async_trait;
+use axum_core::{extract::FromRequestParts, response::IntoResponse};
+use http::request::Parts;
 use sqlx::Transaction;
 
 use crate::{
@@ -114,30 +113,20 @@ impl<DB: sqlx::Database, E> std::ops::DerefMut for Tx<DB, E> {
     }
 }
 
-impl<DB: sqlx::Database, B, E> FromRequest<B> for Tx<DB, E>
+#[async_trait]
+impl<DB: sqlx::Database, B, E> FromRequestParts<B> for Tx<DB, E>
 where
-    B: Send,
+    B: Send + Sync,
     E: From<Error> + IntoResponse,
 {
     type Rejection = E;
 
-    fn from_request<'req, 'ctx>(
-        req: &'req mut RequestParts<B>,
-    ) -> futures_core::future::BoxFuture<'ctx, Result<Self, Self::Rejection>>
-    where
-        'req: 'ctx,
-        Self: 'ctx,
-    {
-        Box::pin(async move {
-            let ext: &mut Lazy<DB> = req
-                .extensions_mut()
-                .get_mut()
-                .ok_or(Error::MissingExtension)?;
+    async fn from_request_parts(parts: &mut Parts, _state: &B) -> Result<Self, Self::Rejection> {
+        let ext: &mut Lazy<DB> = parts.extensions.get_mut().ok_or(Error::MissingExtension)?;
 
-            let tx = ext.get_or_begin().await?;
+        let tx = ext.get_or_begin().await?;
 
-            Ok(Self(tx, PhantomData))
-        })
+        Ok(Self(tx, PhantomData))
     }
 }
 

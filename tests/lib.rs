@@ -126,7 +126,9 @@ async fn layer_error_override() {
                     .unwrap();
             }),
         )
-        .layer(axum_sqlx_tx::Layer::new_with_error::<MyError>(pool.clone()));
+        .layer(&axum_sqlx_tx::Layer::new_with_error::<MyError>(
+            pool.clone(),
+        ));
 
     let response = app
         .oneshot(
@@ -185,8 +187,8 @@ where
         .unwrap();
 
     let app = axum::Router::new()
-        .route("/", axum::routing::get(handler))
-        .layer(axum_sqlx_tx::Layer::new(pool.clone()));
+        .layer(axum_sqlx_tx::Layer::new(pool.clone()))
+        .route("/", axum::routing::get(handler));
 
     let response = app
         .oneshot(
